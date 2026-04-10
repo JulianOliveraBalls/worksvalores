@@ -1,0 +1,6 @@
+playwright
+slack_sdk
+playwright-stealth
+openpyxl
+pandas
+requests
