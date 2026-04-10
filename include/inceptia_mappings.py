@@ -8,7 +8,6 @@ OPERADORES = [
 ]
 
 ESTADO_EVENTO_MAP = {
-    # AVITITUL
     "No Cobró Sueldo": "AVITITUL",
     "Sin Empleo": "AVITITUL",
     "No Puede Pagar": "AVITITUL",
@@ -19,14 +18,25 @@ ESTADO_EVENTO_MAP = {
     "Problema Económico": "AVITITUL",
     "Titular Cortó": "AVITITUL",
     "Enfermedad": "AVITITUL",
-
-    # PRPG
+    "Ocupado": "NOCONTESTA",
+    "Llamando": "NOCONTESTA",
+    "Indefinido": "NOCONTESTA",
+    "Correo de Voz": "CAUT",
+    "Cortó Llamada": "NOCONTESTA",
+    "Número Equivocado": "NOCORRESP",
+    "No Titular": "NOCORRESP",
+    "Transferir": "AVITITUL",
+    "Volver a Llamar": "NOCONTESTA",
+    "Pago Total": "AVITITUL",
+    "Refinanciar": "AVITITUL",
     "Compromete Fecha": "PRPG",
     "Compromete Sin Fecha": "PRPG",
     "Compromete Fecha - Pago Parcial": "PRPG",
     "Compromete Sin Fecha - Pago Parcial": "PRPG",
-
-    
+    "Posterga Pago": "AVITITUL",
+    "Posterga Pago - Pago Parcial": "PRPG",
+    "Insulto": "NOCORRESP",
+    "Pago Incompleto": "AVITITUL",
 }
 
 def map_evento(estado):
@@ -119,6 +129,26 @@ COMENTARIOS = {
         "Llamada al {telefono} no atendida por el titular, salta el contestador automático. Motivo: Buzón de voz.",
         "Intento de comunicación al {telefono}. La llamada es desviada al correo de voz tras varios tonos. Motivo: Contesta buzón."
     ],
+    "Posterga Pago": [
+        "Se contacta al titular al {telefono}. Solicita más tiempo para realizar el pago debido a compromisos previos. Motivo: Postergación de pago.",
+        "Llamada al {telefono}. El cliente indica que no puede abonar hoy y pide ser contactado nuevamente en unos días. Motivo: Pide postergar.",
+        "El titular ({telefono}) manifiesta voluntad de pago pero solicita desplazar la fecha de gestión por motivos personales. Motivo: Posterga gestión."
+    ],
+    "Posterga Pago - Pago Parcial": [
+        "Comunicación al {telefono}. El cliente solicita postergar el pago parcial acordado por falta de liquidez inmediata. Motivo: Posterga abono parcial.",
+        "Se gestiona al titular al {telefono}. Refiere que realizará una entrega mínima más adelante en el mes. Motivo: Pago parcial postergado.",
+        "El titular ({telefono}) indica que no llegará a cubrir el monto parcial hoy y pide unos días de prórroga. Motivo: Prórroga de pago parcial."
+    ],
+    "Insulto": [
+        "Se establece contacto al {telefono}, pero el interlocutor se expresa de forma agresiva e insulta al operador. Motivo: Maltrato / Agresividad.",
+        "Comunicación fallida al {telefono}. El receptor utiliza lenguaje inapropiado impidiendo la gestión de cobro. Motivo: Trato hostil.",
+        "Se intenta gestionar deuda al {telefono}. El titular reacciona con insultos y agresiones verbales. Motivo: Cliente agresivo."
+    ],
+    "Pago Incompleto": [
+        "Se contacta al {telefono}. El titular informa que solo pudo realizar un pago menor al compromiso asumido. Motivo: Pago realizado incompleto.",
+        "El cliente indica al {telefono} que el depósito efectuado no cubre el total de la mora actual. Motivo: Saldo remanente tras pago.",
+        "Verificación con el titular al {telefono}. Manifiesta haber pagado una parte pero reconoce saldo pendiente. Motivo: Pago parcial ejecutado."
+    ],
     "Cortó Llamada": [
         "Se inicia el contacto al {telefono}, pero el interlocutor finaliza la llamada de forma abrupta. Motivo: Cortó comunicación.",
         "Comunicación interrumpida al {telefono} tras presentarnos. No se logra retomar el diálogo. Motivo: Colgaron llamada.",
@@ -150,9 +180,9 @@ COMENTARIOS = {
         "El titular indica al {telefono} que no puede hablar en este momento. Se agenda nuevo contacto. Motivo: Solicita nueva llamada."
     ],
     "Pago Total": [
-        "Se establece contacto al {telefono}. El cliente confirma que procederá a realizar el pago total del saldo pendiente. Motivo: Compromiso de pago total.",
-        "Comunicación efectiva al {telefono}. El titular acepta las condiciones para cancelar la totalidad de su deuda. Motivo: Cancelación total pactada.",
-        "El cliente informa al {telefono} su intención de quedar al día mediante el pago íntegro de la mora. Motivo: Pago total."
+        "Se establece contacto al {telefono}. El titular informa que ya ha realizado el pago total de su deuda. Se procede a verificar en sistema. Motivo: Ya pagó.",
+        "Comunicación con el cliente al {telefono}. Manifiesta haber cancelado la totalidad del saldo pendiente anteriormente. Motivo: Pago ya efectuado.",
+        "El titular atiende al {telefono} e indica que su cuenta ya se encuentra al día tras haber realizado el pago íntegro. Motivo: Cliente informa pago total."
     ],
     "Refinanciar": [
         "Se contacta al titular al {telefono}. Solicita un plan de cuotas o refinanciación para poder afrontar la deuda. Motivo: Pedido de refinanciación.",
