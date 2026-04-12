@@ -33,7 +33,7 @@ default_args = {
 @dag(
     dag_id="cashea_reports_transvalores",
     start_date=datetime(2026, 1, 1),
-    schedule="0 23 * * *",
+    schedule="50 2 * * *", 
     catchup=False,
     default_args=default_args,
     tags=["inceptia", "prod"],
@@ -125,9 +125,11 @@ def inceptia_dag():
         )
         logging.info(f"Reporte {ds_to_use} enviado a Slack.")
 
-    raw_data = extract(bot_id=806)
-    clean_data = transform(raw_data)
-    load(clean_data)
+    data_date = "{{ data_interval_end | ds }}"
+
+    raw_data = extract(bot_id=806, ds=data_date)
+    clean_data = transform(raw_data, ds=data_date)
+    load(clean_data, ds=data_date)
 
 # Ejecución del DAG
 dag_instance = inceptia_dag()

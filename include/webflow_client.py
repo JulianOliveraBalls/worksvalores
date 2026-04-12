@@ -5,7 +5,7 @@ import time
 import logging
 
 class WebFlowAPI:
-    def __init__(self, username="julian.olivera", password="Julian2016"):
+    def __init__(self, username, password):
         self.url_base = "https://cloud.webflow.com.ar/transvalores/cgi-bin"
         self.session = requests.Session()
         self.headers = {
@@ -14,70 +14,81 @@ class WebFlowAPI:
         }
         self.username = username
         self.password = password
+        self._utcs = {
+            "gestiones": "-341768792",
+            "aviso_pago": "-341768792",
+            "entregas": "-341489276",
+            "llamados": "-341769448",
+            "perdidas": "-341493676",
+            "convenios_99": "-341488551" # <-- ESTE FALTABA AGREGAR
+        }
 
     def login(self):
-        logging.info(f"🔑 Iniciando sesión para: {self.username}")
-        payload = {'USERNAME': self.username, 'CLAVE': self.password, 'COUNT': '', 'Op': '', 'homePath': ''}
-        try:
-            res = self.session.post(f"{self.url_base}/log.cgi", data=payload, headers=self.headers)
-            if res.status_code == 200 and "ERROR" not in res.text.upper():
-                logging.info("✅ Login exitoso.")
-                return True
-            return False
-        except Exception as e:
-            logging.error(f"❌ Error en conexión de login: {e}")
-            return False
+        payload = {'USERNAME': self.username, 'CLAVE': self.password, 'Op': '', 'homePath': ''}
+        res = self.session.post(f"{self.url_base}/log.cgi", data=payload, headers=self.headers)
+        return res.status_code == 200 and "ERROR" not in res.text.upper()
 
-    def _fetch(self, endpoint, payload, name, needs_prep=False):
-        logging.info(f"🚀 Procesando reporte: {name}")
-        
-        if needs_prep:
-            prep_payload = payload.copy()
-            prep_payload['OP'] = '102'
-            if 'Op' in prep_payload: del prep_payload['Op']
-            logging.info(f"  > Enviando Paso 102 (Preparación) para {name}")
-            self.session.post(f"{self.url_base}/{endpoint}", data=prep_payload, headers=self.headers)
-            time.sleep(0.5)
+    def _fetch(self, endpoint, payload, name, prep_op=None):
+        if prep_op:
+            prep_data = list(payload) if isinstance(payload, list) else payload.copy()
+            if isinstance(prep_data, list):
+                prep_data = [(k, v) if k.upper() != 'OP' else ('OP', str(prep_op)) for k, v in prep_data]
+            else:
+                prep_data['OP'] = str(prep_op)
 
+            logging.info(f"⏳ Preparando {name} (OP {prep_op})...")
+            self.session.post(f"{self.url_base}/{endpoint}", data=prep_data, headers=self.headers)
+            time.sleep(2)
+
+        logging.info(f"🚀 Descargando {name}...")
         res = self.session.post(f"{self.url_base}/{endpoint}", data=payload, headers=self.headers)
         
-        if res.status_code == 200 and len(res.content) > 100 and b"<HTML" not in res.content[:100].upper():
-            df = pd.read_csv(StringIO(res.text), sep='\t', encoding='latin-1', on_bad_lines='skip')
-            logging.info(f"  📊 {name}: {len(df)} filas.")
-            return df
-        
-        logging.warning(f"  ⚠️ {name}: No se obtuvieron datos o el servidor devolvió HTML.")
+        if res.status_code == 200 and len(res.text) > 50 and "<HTML" not in res.text.upper()[:100]:
+            return pd.read_csv(StringIO(res.text), sep='\t', encoding='latin-1', on_bad_lines='skip')
         return pd.DataFrame()
 
-    def get_gestiones(self, f_inicio, f_fin):
+    def get_entregas(self, ids_cliente=[330, 260], estados=[302, 303]):
+        payload = [
+            ("Op", "4"), ("Nivel", "0"), ("IdControl", ""), ("IdRegistro", ""),
+            ("UTC", self._utcs["entregas"]), ("ID_LISTADO", "77"),
+            ("IDS_CLIENTE__FMT", ",%d"), ("LEGAJO_DESDE", "0"), ("LEGAJO_HASTA", "9999999"),
+            ("ESTADOS__FMT", ",%d")
+        ]
+        for cid in ids_cliente: payload.append(("IDS_CLIENTE", str(cid)))
+        for est in estados: payload.append(("ESTADOS", str(est)))
+        return self._fetch("reportes.cgi", payload, "Entregas", prep_op=102)
+
+    def get_gestiones(self, f_desde, f_hasta, id_cliente=0, id_estimulo=186, id_usuario=1, rel_estimulo="<>", rel_usuario="="):
         payload = {
-            "Op": "4", "UTC": "-341767742", "ID_CLIENTE": "0", "FECHA_INICIAL": f_inicio, "FECHA_FINAL": f_fin,
-            "HORA_INICIAL": "00:00", "HORA_FINAL": "23:59", "ID_ESTIMULO": "186", "ID_USUARIO": "1", "GRUPO": "TODOS",
-            "REL_ESTIMULO": "<>", "REL_USUARIO": "<>", "incluir_entrega": "1", "incluir_cliente": "1", "incluir_costo": "1"
+            "Op": 4, "UTC": self._utcs["gestiones"], "ID_CLIENTE": id_cliente,
+            "FECHA_INICIAL": f_desde, "FECHA_FINAL": f_hasta, "HORA_INICIAL": "00:00", "HORA_FINAL": "23:59",
+            "ID_ESTIMULO": id_estimulo, "ID_USUARIO": id_usuario, "GRUPO": "TODOS",
+            "REL_ESTIMULO": rel_estimulo, "REL_USUARIO": rel_usuario, "incluir_entrega": 1, "incluir_cliente": 1, "incluir_costo": 1
         }
         return self._fetch("rephistoriales.cgi", payload, "Gestiones")
 
-    def get_llamados(self, f_inicio, f_fin):
+    def get_aviso_pago(self, f_desde, f_hasta):
         payload = {
-            "Op": "4", "UTC": "-341769448", "FECHA_DESDE": f_inicio, "HORA_DESDE": "0", 
-            "FECHA_HASTA": f_fin, "HORA_HASTA": "0", "INTERNO": "-1", "TIPO": "1", "OPERADOR": "-1"
+            "Op": 4, "Nivel": 0, "IdControl": "", "IdRegistro": "", "UTC": self._utcs["aviso_pago"],
+            "ID_LISTADO": 23, "IDS_OPERADOR": 0, "IDS_OPERADOR__FMT": ",%d", "FECHA_DESDE": f_desde, "FECHA_HASTA": f_hasta
+        }
+        return self._fetch("reportes.cgi", payload, "Avisos de Pago")
+    
+    def get_convenios_pago(self, f_desde, f_hasta):
+        payload = {
+            "Op": 4, "Nivel": 0, "IdControl": "", "IdRegistro": "",
+            "UTC": self._utcs["convenios_99"], "ID_LISTADO": 99,
+            "IDS_ENTREGA": "0-0", "DESDE": f_desde, "HASTA": f_hasta
+        }
+        return self._fetch("reportes.cgi", payload, "Convenios de Pago", prep_op=102)
+
+    def get_perdidas(self, f_desde, f_hasta):
+        payload = { "Op": 4, "Nivel": 0, "UTC": self._utcs["perdidas"], "FECHA_DESDE": f_desde, "FECHA_HASTA": f_hasta }
+        return self._fetch("repllamadasperdidas.cgi", payload, "Perdidas", prep_op=3)
+
+    def get_llamados(self, f_desde, f_hasta):
+        payload = {
+            "Op": 4, "UTC": self._utcs["llamados"], "FECHA_DESDE": f_desde, "HORA_DESDE": "0", 
+            "FECHA_HASTA": f_hasta, "HORA_HASTA": "0", "INTERNO": -1, "TIPO": 1, "OPERADOR": -1
         }
         return self._fetch("replistadollamados.cgi", payload, "Llamados")
-
-    def get_perdidas(self, f_inicio, f_fin):
-        payload = {"Op": "4", "UTC": "-341769448", "FECHA_DESDE": f_inicio, "FECHA_HASTA": f_fin}
-        return self._fetch("repllamadasperdidas.cgi", payload, "Perdidas")
-
-    def get_aviso_pago(self, f_inicio, f_fin):
-        payload = {
-            "Op": "4", "Nivel": "0", "UTC": "-341767724", "ID_LISTADO": "23", 
-            "IDS_OPERADOR": "0", "IDS_OPERADOR__FMT": ",%d", "FECHA_DESDE": f_inicio, "FECHA_HASTA": f_fin
-        }
-        return self._fetch("reportes.cgi", payload, "Aviso de Pago", needs_prep=True)
-
-    def get_entregas(self, f_inicio, f_fin):
-        payload = {
-            "Op": "4", "Nivel": "0", "UTC": "-341769323", "ID_LISTADO": "99",
-            "IDS_ENTREGA": "0-0", "DESDE": f_inicio, "HASTA": f_fin
-        }
-        return self._fetch("reportes.cgi", payload, "Entregas", needs_prep=True)
