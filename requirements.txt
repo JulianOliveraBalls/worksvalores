@@ -2,3 +2,5 @@ openpyxl
 pandas
 requests
 slack_sdk
+playwright
+pyotp

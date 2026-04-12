@@ -1,7 +1,6 @@
 version: "3.8"
 
 services:
-
   postgres:
     image: postgres:13
     restart: always
@@ -24,7 +23,7 @@ services:
       - redis
     env_file:
       - .env 
-    environment:
+    environment: &airflow-common-env
       AIRFLOW__CORE__EXECUTOR: CeleryExecutor
       AIRFLOW__CORE__FERNET_KEY: ccLfeIwgdRtCNu9qcBOAZdBQoHYGAuNGH0VEcGRycvA=
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
@@ -35,11 +34,14 @@ services:
       PYTHONPATH: /opt/airflow
       SLACK_BOT_TOKEN: ${SLACK_BOT_TOKEN}
       _PIP_ADDITIONAL_REQUIREMENTS: "-r /requirements.txt"
+      # Mantiene los navegadores en tu carpeta include de la VPS
+      PLAYWRIGHT_BROWSERS_PATH: /opt/airflow/include/playwright_browsers
     volumes:
       - ./dags:/opt/airflow/dags
       - ./output:/opt/airflow/output
       - ./include:/opt/airflow/include
       - ./requirements.txt:/requirements.txt
+      - /var/run/docker.sock:/var/run/docker.sock
     ports:
       - "127.0.0.1:8083:8080"
     command: webserver
@@ -51,21 +53,13 @@ services:
       - airflow-webserver
     env_file:
       - .env 
-    environment:
-      AIRFLOW__CORE__EXECUTOR: CeleryExecutor
-      AIRFLOW__CORE__FERNET_KEY: ccLfeIwgdRtCNu9qcBOAZdBQoHYGAuNGH0VEcGRycvA=
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
-      AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
-      AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@postgres/airflow
-      PYTHONPATH: /opt/airflow
-      AIRFLOW__WEBSERVER__SECRET_KEY: "Transvalores676+"
-      SLACK_BOT_TOKEN: ${SLACK_BOT_TOKEN}
-      _PIP_ADDITIONAL_REQUIREMENTS: "-r /requirements.txt"
+    environment: *airflow-common-env
     volumes:
       - ./dags:/opt/airflow/dags
       - ./include:/opt/airflow/include
       - ./output:/opt/airflow/output
       - ./requirements.txt:/requirements.txt
+      - /var/run/docker.sock:/var/run/docker.sock
     command: scheduler
 
   airflow-worker:
@@ -76,22 +70,15 @@ services:
       - redis
     env_file:
       - .env 
-    environment:
-      AIRFLOW__CORE__EXECUTOR: CeleryExecutor
-      AIRFLOW__CORE__FERNET_KEY: ccLfeIwgdRtCNu9qcBOAZdBQoHYGAuNGH0VEcGRycvA=
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
-      AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
-      AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@postgres/airflow
-      PYTHONPATH: /opt/airflow
-      AIRFLOW__WEBSERVER__SECRET_KEY: "Transvalores676+"
-      SLACK_BOT_TOKEN: ${SLACK_BOT_TOKEN}
-      _PIP_ADDITIONAL_REQUIREMENTS: "-r /requirements.txt"
+    environment: *airflow-common-env
     volumes:
       - ./dags:/opt/airflow/dags
       - ./include:/opt/airflow/include
       - ./output:/opt/airflow/output
       - ./requirements.txt:/requirements.txt
+      - /var/run/docker.sock:/var/run/docker.sock
+    # Quitamos el comando de apt-get para evitar el bootloop
     command: celery worker
 
 volumes:
-  postgres_data:  
+  postgres_data:

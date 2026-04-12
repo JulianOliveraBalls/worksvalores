@@ -11,3 +11,7 @@ node_modules/
 logs/
 airflow.db
 include/drive_service_accpunt.json
+include/playwright_browsers/
+include/*.csv
+include/state.json
+output/
