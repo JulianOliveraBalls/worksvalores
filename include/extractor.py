@@ -7,25 +7,43 @@ def run_extraction():
     base_path = "/opt/airflow/include"
     state_path = f"{base_path}/state.json"
     
-    file_asignaciones = f"{base_path}/reporte_asignaciones.csv"
-    current_month = datetime.now().strftime("%Y-%m")
-    file_pagos = f"{base_path}/reporte_pagos_{current_month}.csv"
+    # Rutas finales (usamos /tmp para que el DAG las borre)
+    file_asignaciones = "/tmp/reporte_asignaciones.csv"
+    file_pagos = "/tmp/reporte_pagos.csv"
 
     with sync_playwright() as p:
         print("🚀 Iniciando navegador...")
         browser = p.chromium.launch(headless=True)
-        context = browser.new_context(storage_state=state_path)
+        
+        # Agregamos viewports y camuflaje
+        context = browser.new_context(
+            storage_state=state_path,
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+            viewport={'width': 1920, 'height': 1080}
+        )
+        
         page = context.new_page()
+        # Hack para ocultar que es un bot
+        page.add_init_script("delete navigator.webdriver")
 
         try:
             # --- PARTE 1: ASIGNACIONES ---
-            print("📥 Extrayendo Asignaciones...")
+            print("📥 Navegando a Asignaciones...")
             url_asig = "https://support.cashea.retool.com/apps/dc2f2576-0cea-11f1-bd08-17e6dccfb9af/Recuperaciones/Despachos%20-%20Asignaciones%20y%20Pagos/Asignaciones"
-            page.goto(url_asig, wait_until="networkidle")
             
-            # Esperamos específicamente el botón de asignaciones
-            page.wait_for_selector('button[data-testid="Component::Action-AssignmentInstallmentsButton--0"]', timeout=30000)
-            with page.expect_download() as download_info:
+            # Vamos a la URL
+            response = page.goto(url_asig, wait_until="load", timeout=60000)            
+            # Si nos mandó al login, la URL habrá cambiado
+            if "login" in page.url:
+                page.screenshot(path=f"{base_path}/debug_AL_LOGIN.png")
+                print("❌ ERROR: La sesión expiró y estamos en el LOGIN. Revisar debug_AL_LOGIN.png")
+                return # Salimos para no romper nada
+
+            print("Esperando botón de Asignaciones...")
+            selector_asig = 'button[data-testid="Component::Action-AssignmentInstallmentsButton--0"]'
+            page.wait_for_selector(selector_asig, timeout=60000)
+            
+            with page.expect_download(timeout=60000) as download_info:
                 page.get_by_test_id("Component::Action-AssignmentInstallmentsButton--0").click()
             
             download_asig = download_info.value
@@ -35,32 +53,26 @@ def run_extraction():
             # --- PARTE 2: PAGOS ---
             print("📥 Navegando a pestaña de Pagos...")
             url_pagos = "https://support.cashea.retool.com/apps/dc2f2576-0cea-11f1-bd08-17e6dccfb9af/Recuperaciones/Despachos%20-%20Asignaciones%20y%20Pagos/Pagos"
-            page.goto(url_pagos, wait_until="networkidle")
+            page.goto(url_pagos, wait_until="load", timeout=60000)
             
-            # USAMOS EL SELECTOR QUE ME PASASTE
-            print("Esperando botón de descarga de Pagos...")
-            page.wait_for_selector('button[data-testid="Component::Action-AssignmentPaymentsButton--0"]', timeout=30000)
+            print("Esperando botón de Pagos...")
+            selector_pagos = 'button[data-testid="Component::Action-AssignmentPaymentsButton--0"]'
+            page.wait_for_selector(selector_pagos, timeout=60000)
             
-            with page.expect_download() as download_info_pagos:
+            with page.expect_download(timeout=60000) as download_info_pagos:
                 page.get_by_test_id("Component::Action-AssignmentPaymentsButton--0").click()
             
             download_p = download_info_pagos.value
             download_p.save_as(file_pagos)
             print(f"✅ Pagos guardados.")
 
-            # --- PARTE 3: LOGS (HEAD) ---
-            print("\n--- 📊 DATA PREVIEW ---")
-            for name, path in [("ASIGNACIONES", file_asignaciones), ("PAGOS", file_pagos)]:
-                if os.path.exists(path):
-                    df = pd.read_csv(path)
-                    print(f"\n[{name}] - Filas: {len(df)}")
-                    print(df.head(3))
-
+            # --- SOLO SI LLEGÓ ACÁ ACTUALIZAMOS LA SESIÓN ---
             context.storage_state(path=state_path)
-            print("\n🔄 Sesión renovada.")
+            print("\n🔄 Sesión renovada con éxito.")
 
         except Exception as e:
-            print(f"❌ Error: {e}")
+            page.screenshot(path=f"{base_path}/error_ultimo_intento.png")
+            print(f"❌ Error crítico: {e}. Foto guardada en error_ultimo_intento.png")
             raise e
         finally:
             browser.close()
