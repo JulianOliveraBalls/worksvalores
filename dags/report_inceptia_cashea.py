@@ -154,7 +154,7 @@ def inceptia_dag():
             raise
 
     # --- Flujo de ejecución ---
-    data_date = "{{ data_interval_end | ds }}"
+    data_date = "{{ data_interval_start | ds }}"
 
     path_raw = extract(bot_id=BOT_ID_CASHEA, ds=data_date)
     path_final = transform(path_raw, ds=data_date)

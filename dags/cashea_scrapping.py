@@ -22,7 +22,7 @@ with DAG(
     default_args=default_args,
     start_date=datetime(2026, 4, 12),
     # 00:00, 12:00, 17:00, 20:00 UTC -> 21:00, 09:00, 14:00, 17:00 Mendoza
-    schedule_interval='0 0,12,17,20 * * *',
+    schedule_interval='0 0,12,15,17,20 * * *',
     catchup=False,
     tags=['cashea', 'prod']
 ) as dag:
@@ -47,45 +47,46 @@ with DAG(
         import pandas as pd
         import os
         import logging
-        from datetime import timedelta
+        import pendulum
 
-        # Ajuste de fecha local
-        logical_date = kwargs['logical_date']
-        fecha_local = (logical_date - timedelta(hours=3)).strftime('%Y-%m-%d')
+
+        tz_mza = pendulum.timezone("America/Argentina/Buenos_Aires")
+        fecha_local = pendulum.now(tz_mza).format('YYYY-MM-DD')
+        
+        logging.info(f"🔎 Ejecutando reporte con fecha real de Mendoza: {fecha_local}")
         
         slack_hook = SlackHook(slack_conn_id="slack_conn")
         ID_CANAL = "C0ARL1VRSVC"
         mensaje_sumatoria = ""
         
-        # 1. Procesar Sumatoria de Pagos
+        # 2. Procesar Sumatoria de Pagos
         if os.path.exists(PATH_PAGOS):
             try:
                 df = pd.read_csv(PATH_PAGOS, low_memory=False)
                 df['montoPagado'] = pd.to_numeric(df['montoPagado'].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
                 df['fecha_clean'] = pd.to_datetime(df['fechaEfectivaPago'], errors='coerce').dt.strftime('%Y-%m-%d')
                 
+                # Filtramos por la fecha de hoy en Mendoza
                 pagos_hoy = df[df['fecha_clean'] == fecha_local]
                 total_recaudado = pagos_hoy['montoPagado'].sum()
                 
                 mensaje_sumatoria = f"\n💰 *Total recaudado hoy ({fecha_local}):* ${total_recaudado:,.2f}"
-                logging.info(f"✅ Filas encontradas: {len(pagos_hoy)} | Total: {total_recaudado}")
+                logging.info(f"✅ Filas encontradas para {fecha_local}: {len(pagos_hoy)} | Total: {total_recaudado}")
                 
             except Exception as e:
                 logging.error(f"❌ Error en sumatoria: {str(e)}")
                 mensaje_sumatoria = f"\n⚠️ Error al calcular sumatoria."
 
-        # 2. Verificar archivos presentes
+        # 3. Verificar archivos y enviar a Slack
         archivos = [PATH_PAGOS, PATH_ASIGNACIONES]
         presentes = [f for f in archivos if os.path.exists(f)]
 
         if presentes:
-            # Enviar Mensaje de texto
             slack_hook.get_conn().chat_postMessage(
                 channel=ID_CANAL, 
                 text=f":bar_chart: *Reporte Automático Transvalores* - Fecha: {fecha_local}{mensaje_sumatoria}"
             )
 
-            # Enviar cada archivo y borrarlo
             for path in presentes:
                 slack_hook.get_conn().files_upload_v2(
                     channel=ID_CANAL,
@@ -95,11 +96,5 @@ with DAG(
                 os.remove(path)
                 logging.info(f"🗑️ {path} enviado y eliminado.")
         else:
-            logging.error(f"❌ No se encontraron archivos para enviar en {fecha_local}")
-            slack_hook.get_conn().chat_postMessage(
-                channel=ID_CANAL, 
-                text=f"ℹ️ *Reporte ({fecha_local})*: El extractor no generó archivos CSV."
-            )
-
-    # Definición del flujo
+            logging.error(f"❌ No se encontraron archivos para enviar.")
     tarea_extraccion >> procesar_y_enviar_slack()

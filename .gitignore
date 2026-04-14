@@ -1,17 +1,35 @@
+# --- Python & Environment ---
 __pycache__/
-*.pyc
-*.log
+*.py[cod]
+*$py.class
 .env
 .venv/
 venv/
 env/
-node_modules/
+
+# --- Airflow & Data ---
+airflow.db
+logs/
+*.log
 *.csv
 *.xlsx
-logs/
-airflow.db
-include/drive_service_accpunt.json
+output/
+
+# --- Project Specific (Airflow DAGs) ---
+# Ignora copias accidentales o temporales en la carpeta de DAGs
+dags/**/* copy.py
+dags/**/*.bak
+dags/**/*_old.py
+
+# --- Scrapers & Browsers (Playwright) ---
+node_modules/
 include/playwright_browsers/
-include/*.csv
 include/state.json
-output/git add .
+
+# --- Sensitive Credentials ---
+# Muy importante para tus integraciones con Google Drive y APIs
+include/drive_service_account.json
+include/*.csv
+
+# --- General ---
+.DS_Storedags/* copy.py
