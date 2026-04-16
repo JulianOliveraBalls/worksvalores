@@ -5,22 +5,20 @@ import time
 import logging
 
 class WebFlowAPI:
-    def __init__(self, username, password):
+    def __init__(self):
         self.url_base = "https://cloud.webflow.com.ar/transvalores/cgi-bin"
         self.session = requests.Session()
         self.headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36...',
             'Content-Type': 'application/x-www-form-urlencoded'
         }
-        self.username = username
-        self.password = password
+        self.username = "julian.olivera"
+        self.password = "Julian2016"
         self._utcs = {
             "gestiones": "-341768792",
-            "aviso_pago": "-341768792",
-            "entregas": "-341489276",
-            "llamados": "-341769448",
-            "perdidas": "-341493676",
-            "convenios_99": "-341488551" # <-- ESTE FALTABA AGREGAR
+            "entregas": "-341489276", "llamados": "-341769448",
+            "perdidas": "-341493676", "convenios_99": "-341488551",
+            "aviso_pago": "-341168283"
         }
 
     def login(self):
@@ -35,14 +33,9 @@ class WebFlowAPI:
                 prep_data = [(k, v) if k.upper() != 'OP' else ('OP', str(prep_op)) for k, v in prep_data]
             else:
                 prep_data['OP'] = str(prep_op)
-
-            logging.info(f"⏳ Preparando {name} (OP {prep_op})...")
             self.session.post(f"{self.url_base}/{endpoint}", data=prep_data, headers=self.headers)
             time.sleep(2)
-
-        logging.info(f"🚀 Descargando {name}...")
         res = self.session.post(f"{self.url_base}/{endpoint}", data=payload, headers=self.headers)
-        
         if res.status_code == 200 and len(res.text) > 50 and "<HTML" not in res.text.upper()[:100]:
             return pd.read_csv(StringIO(res.text), sep='\t', encoding='latin-1', on_bad_lines='skip')
         return pd.DataFrame()
@@ -58,7 +51,7 @@ class WebFlowAPI:
         for est in estados: payload.append(("ESTADOS", str(est)))
         return self._fetch("reportes.cgi", payload, "Entregas", prep_op=102)
 
-    def get_gestiones(self, f_desde, f_hasta, id_cliente=0, id_estimulo=186, id_usuario=1, rel_estimulo="<>", rel_usuario="="):
+    def get_gestiones(self, f_desde, f_hasta, id_cliente=0, id_estimulo=0, id_usuario=0, rel_estimulo="=", rel_usuario="="):
         payload = {
             "Op": 4, "UTC": self._utcs["gestiones"], "ID_CLIENTE": id_cliente,
             "FECHA_INICIAL": f_desde, "FECHA_FINAL": f_hasta, "HORA_INICIAL": "00:00", "HORA_FINAL": "23:59",
@@ -66,13 +59,6 @@ class WebFlowAPI:
             "REL_ESTIMULO": rel_estimulo, "REL_USUARIO": rel_usuario, "incluir_entrega": 1, "incluir_cliente": 1, "incluir_costo": 1
         }
         return self._fetch("rephistoriales.cgi", payload, "Gestiones")
-
-    def get_aviso_pago(self, f_desde, f_hasta):
-        payload = {
-            "Op": 4, "Nivel": 0, "IdControl": "", "IdRegistro": "", "UTC": self._utcs["aviso_pago"],
-            "ID_LISTADO": 23, "IDS_OPERADOR": 0, "IDS_OPERADOR__FMT": ",%d", "FECHA_DESDE": f_desde, "FECHA_HASTA": f_hasta
-        }
-        return self._fetch("reportes.cgi", payload, "Avisos de Pago")
     
     def get_convenios_pago(self, f_desde, f_hasta):
         payload = {
@@ -81,7 +67,17 @@ class WebFlowAPI:
             "IDS_ENTREGA": "0-0", "DESDE": f_desde, "HASTA": f_hasta
         }
         return self._fetch("reportes.cgi", payload, "Convenios de Pago", prep_op=102)
-
+    
+    def get_aviso_pago(self, f_desde, f_hasta):
+        payload = {
+            "Op": 4, "Nivel": 0, "IdControl": "", "IdRegistro": "", 
+            "UTC": self._utcs["aviso_pago"],
+            "ID_CLIENTE": 0, "FECHA_DESDE": f_desde, "ID_ENTREGA": 0, 
+            "FECHA_HASTA": f_hasta, "ID_USUARIO": 0, "GRUPO": "TODOS"
+        }
+        
+        return self._fetch("reppromesas.cgi", payload, "Avisos de Pago", prep_op=102)
+    
     def get_perdidas(self, f_desde, f_hasta):
         payload = { "Op": 4, "Nivel": 0, "UTC": self._utcs["perdidas"], "FECHA_DESDE": f_desde, "FECHA_HASTA": f_hasta }
         return self._fetch("repllamadasperdidas.cgi", payload, "Perdidas", prep_op=3)

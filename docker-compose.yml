@@ -16,7 +16,7 @@ services:
     restart: always
 
   airflow-webserver:
-    image: apache/airflow:2.8.1
+    build: .
     restart: always
     depends_on:
       - postgres
@@ -47,7 +47,7 @@ services:
     command: webserver
 
   airflow-scheduler:
-    image: apache/airflow:2.8.1
+    build: .
     restart: always
     depends_on:
       - airflow-webserver
@@ -63,7 +63,7 @@ services:
     command: scheduler
 
   airflow-worker:
-    image: apache/airflow:2.8.1
+    build: .
     restart: always
     depends_on:
       - postgres

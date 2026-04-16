@@ -21,7 +21,8 @@ with DAG(
     'cashea_retool_extractor',
     default_args=default_args,
     start_date=datetime(2026, 4, 12),
-    # 00:00, 12:00, 17:00, 20:00 UTC -> 21:00, 09:00, 14:00, 17:00 Mendoza
+    # 00:00, 12:00, 15:00, 17:00, 20:00 Schedule
+    # 21:00, 09:00, 12:00, 14:00, 17:00 Mendoza
     schedule_interval='0 0,12,15,17,20 * * *',
     catchup=False,
     tags=['cashea', 'prod']
