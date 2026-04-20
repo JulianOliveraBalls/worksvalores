@@ -128,7 +128,7 @@ def inceptia_dag():
         """Envía el Excel a Slack o notifica la ausencia de datos."""
         ds_to_use = FECHA_TEST if MODO_TEST else ds
         slack_hook = SlackHook(slack_conn_id="slack_conn")
-        channel_id = "C0ARL1VRSVC" # Canal de Transvalores / Cashea
+        channel_id = "C0ARL1VRSVC" 
 
         if path_xlsx == "NO_DATA":
             msg = f"ℹ️ *Reporte Inceptia ({ds_to_use})*: No se registraron gestiones (Bot {BOT_ID_CASHEA})."

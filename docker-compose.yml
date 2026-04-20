@@ -60,6 +60,8 @@ services:
       - ./output:/opt/airflow/output
       - ./requirements.txt:/requirements.txt
       - /var/run/docker.sock:/var/run/docker.sock
+      - ./shared:/opt/airflow/shared 
+      
     command: scheduler
 
   airflow-worker:
@@ -77,7 +79,7 @@ services:
       - ./output:/opt/airflow/output
       - ./requirements.txt:/requirements.txt
       - /var/run/docker.sock:/var/run/docker.sock
-    # Quitamos el comando de apt-get para evitar el bootloop
+      - ./shared:/opt/airflow/shared 
     command: celery worker
 
 volumes:

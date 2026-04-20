@@ -8,8 +8,8 @@ def run_extraction():
     state_path = f"{base_path}/state.json"
     
     # Rutas finales (usamos /tmp para que el DAG las borre)
-    file_asignaciones = "/tmp/reporte_asignaciones.csv"
-    file_pagos = "/tmp/reporte_pagos.csv"
+    file_asignaciones = "/opt/airflow/shared/reporte_asignaciones.csv"
+    file_pagos = "/opt/airflow/shared/reporte_pagos.csv"
 
     with sync_playwright() as p:
         print("🚀 Iniciando navegador...")

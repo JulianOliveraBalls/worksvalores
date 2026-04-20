@@ -16,9 +16,10 @@ from include.inceptia_client import InceptiaAPI
 # --- CONFIGURACIÓN GLOBAL ---
 BOT_ID_PAGOS = 505
 SLACK_CONN_ID = "slack_conn"
-CHANNEL_ID = "C09V4KUCYBG" 
-BLACK_LIST = ["WEBFLOW", "AGUSTIN BIZZOTTO", "JOSEFINA MANGIAROTTI", "DISCADOR PREDICTIVO", "NAN", "NONE", "TAPIA PAULA ANDREA"]
-# Eliminamos las comillas simples extra que tenías dentro del texto
+CHANNEL_ID = "C09V4KUCYBG"
+#OPERACIONES C0104DJRX5M
+#TEST C09V4KUCYBG
+BLACK_LIST = ["WEBFLOW", "AGUSTIN BIZZOTTO", "JOSEFINA MANGIAROTTI", "DISCADOR PREDICTIVO", "NAN", "MONTEMARSILVANA", "TAPIA PAULA ANDREA"]
 BLACKLIST_EVENTOS = ["NotificaciÛn PBX", "MANIPULACION MASIVA"]
 OBJETIVO_DIARIO = 1500000
 
@@ -52,14 +53,14 @@ def formatear_pesos(valor):
     return f"$ {valor:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
 
 def es_habil(fecha):
-    if fecha.day_of_week >= 6: return False 
+    if fecha.day_of_week >= 5: return False 
     if fecha.to_date_string() in FERIADOS_2026: return False
     return True
 
 @dag(
     dag_id="report_daily_operators",
     start_date=datetime(2026, 1, 1),
-    schedule="0 9 * * 1-5", 
+    schedule="0 12 * * 1-5",  # 12 UTC = 09:00 MZA
     catchup=False,
     max_active_runs=1,
     default_args={"owner": "Julián", "retries": 0},
@@ -71,11 +72,18 @@ def pagos_reporte_dag():
     def extract_data():
         tz = 'America/Argentina/Mendoza'
         hoy = pendulum.now(tz)
-        if hoy.to_date_string() in FERIADOS_2026: raise AirflowSkipException("Hoy es feriado.")
+        #FECHA TEST. hoy = pendulum.datetime(2026, 2, 18, tz=tz)
+
+
+        if not es_habil(hoy):
+            raise AirflowSkipException(f"Hoy {hoy.to_date_string()} no es día hábil, skip.")
 
         gestion = hoy.subtract(days=1)
         while not es_habil(gestion):
+            logging.info(f"⏭️ Saltando {gestion.to_date_string()} | day_of_week={gestion.day_of_week}")
             gestion = gestion.subtract(days=1)
+
+        logging.info(f"🗓️ Hoy: {hoy.to_date_string()} | Gestión calculada: {gestion.to_date_string()}")
 
         f_gestion = gestion.format('DD/MM/YYYY')
         f_corte = hoy.format('DD/MM/YYYY')
@@ -207,26 +215,38 @@ def pagos_reporte_dag():
         msg = f"📊 *Resumen de Gestión Diaria - {f_gestion}*\n```\n{tabla}\n```"
         client.chat_postMessage(channel=CHANNEL_ID, text=msg)
 
-       # 7. Inceptia - Interesados SIN GESTIONES (más estricto)
+# 7. Inceptia - Leads Pendientes (Formato Snippet de Slack)
         if not df_bots.empty:
             dnis_gestionados = set()
-            # Usamos df_g para capturar CUALQUIER tipo de gestión realizada
             if not df_g.empty and 'NRO DOC' in df_g.columns:
                 dnis_gestionados = set(df_g['NRO DOC'].astype(str).str.strip().unique())
             
             df_bots['DNI_B'] = df_bots['params.code'].astype(str).str.strip()
-            # Filtramos: Solo los que NO tienen ninguna gestión en df_g
             df_pend = df_bots[~df_bots['DNI_B'].isin(dnis_gestionados)].copy()
             
             if not df_pend.empty:
                 df_pend = df_pend[['DNI_B', 'phone']].rename(columns={'DNI_B': 'DNI', 'phone': 'Teléfono'}).drop_duplicates()
-                bot_list = tabulate(df_pend, headers='keys', tablefmt='plain', showindex=False)
-                client.chat_postMessage(
-                    channel=CHANNEL_ID, 
-                    text=f"🤖 *Inceptia - Interesados SIN GESTIÓN el {f_gestion}*\n```\n{bot_list}\n```"
-                )
+                
+                # Enumeración para el equipo
+                df_pend = df_pend.reset_index(drop=True)
+                df_pend.index = df_pend.index + 1
+                df_pend = df_pend.reset_index().rename(columns={'index': '#'})
+                
+                # Convertimos a una tabla de texto simple para el snippet
+                bot_table = tabulate(df_pend, headers='keys', tablefmt='plain', showindex=False)
+                
+                # ENVIAR COMO ARCHIVO (Snippet)
+                try:
+                    client.files_upload_v2(
+                        channel=CHANNEL_ID,
+                        content=bot_table,
+                        filename=f"leads_pendientes_{f_gestion.replace('/','-')}.txt",
+                        title=f"🤖 Leads Inceptia sin Gestión - {f_gestion}",
+                    )
+                except Exception as e:
+                    logging.error(f"Error enviando snippet de Inceptia: {e}")
             else:
-                client.chat_postMessage(channel=CHANNEL_ID, text=f"🤖 *Inceptia:* Todos los interesados del {f_gestion} ya tienen gestiones registradas.")
+                client.chat_postMessage(channel=CHANNEL_ID, text=f"🤖 *Inceptia:* Todos los interesados del {f_gestion} ya fueron gestionados.")
         else:
             client.chat_postMessage(channel=CHANNEL_ID, text=f"🤖 No hubo llamados de IA el {f_gestion}.")
 
