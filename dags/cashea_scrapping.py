@@ -19,6 +19,7 @@ BATCH_SIZE = 5000
 POSTGRES_CONN_ID = Variable.get("postgres_conn_id", default_var="postgres_dwh")
 SLACK_CONN_ID    = Variable.get("slack_conn_id",    default_var="slack_conn")
 ID_CANAL         = Variable.get("cashea_slack_canal",       default_var="C09V4KUCYBG")
+ID_CANAL_ERROR = Variable.get("reports_slack_canal",       default_var="C09V4KUCYBG")
 
 
 def alerta_slack_error(context):
@@ -28,7 +29,7 @@ def alerta_slack_error(context):
         task_id   = context['task_instance'].task_id
         exec_date = context['execution_date']
         slack_hook.get_conn().chat_postMessage(
-            channel=ID_CANAL,
+            channel=ID_CANAL_ERROR,
             text=(
                 f":red_circle: *ERROR en DAG `{dag_id}`*\n"
                 f"📌 Tarea: `{task_id}`\n"

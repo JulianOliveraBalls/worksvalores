@@ -16,7 +16,7 @@ from include.inceptia_client import InceptiaAPI
 # --- CONFIGURACIÓN GLOBAL ---
 BOT_ID_PAGOS = 505
 SLACK_CONN_ID = "slack_conn"
-CHANNEL_ID = "C09V4KUCYBG"
+CHANNEL_ID = "C0104DJRX5M"
 #OPERACIONES C0104DJRX5M
 #TEST C09V4KUCYBG
 BLACK_LIST = ["WEBFLOW", "AGUSTIN BIZZOTTO", "JOSEFINA MANGIAROTTI", "DISCADOR PREDICTIVO", "NAN", "MONTEMARSILVANA", "TAPIA PAULA ANDREA"]
@@ -63,8 +63,13 @@ def es_habil(fecha):
     schedule="0 12 * * 1-5",  # 12 UTC = 09:00 MZA
     catchup=False,
     max_active_runs=1,
-    default_args={"owner": "Julián", "retries": 0},
+    default_args={
+    "owner": "Julián",
+    "retries": 3,
+    "retry_delay": timedelta(minutes=5),
+},
     tags=["transvalores", "prod"],
+    
 )
 def pagos_reporte_dag():
 
@@ -91,14 +96,21 @@ def pagos_reporte_dag():
         f_fin_avisos = hoy.add(weeks=1).format('DD/MM/YYYY')
         ds_gestion = gestion.to_date_string()
 
+
         wf = WebFlowAPI()
         wf.login()
         
+        gestiones = wf.get_gestiones(f_gestion, f_gestion)
+        llamados = wf.get_llamados(f_gestion, f_corte)
+        
+        if (gestiones is None or gestiones.empty) and (llamados is None or llamados.empty):
+            raise ValueError(f"⚠️ Data no disponible para {f_gestion}. Reintentando en 5 min...")
+
         data = {
-            "gestiones": wf.get_gestiones(f_gestion, f_gestion),
+            "gestiones": gestiones,
             "convenios": wf.get_convenios_pago(f_gestion, f_gestion),
             "avisos": wf.get_aviso_pago(f_inicio_avisos, f_fin_avisos), 
-            "llamados": wf.get_llamados(f_gestion, f_corte),
+            "llamados": llamados,
             "perdidas": wf.get_perdidas(f_gestion, f_gestion),
             "bots": InceptiaAPI().obtener_todos_los_casos(BOT_ID_PAGOS, ds_gestion, ds_gestion, estado="Interesado - Transferir"),
             "fecha_reportada": f_gestion
@@ -153,6 +165,9 @@ def pagos_reporte_dag():
         for df, col in [(df_g, 'EMPLEADO'), (df_cv, 'USUARIO CARGA'), (df_av, 'USUARIO GESTION'), (df_ll, 'nombre')]:
             activos.update(limpiar_n(df, col).dropna().unique())
         lista_final = sorted([e for e in activos if e not in BLACK_LIST and len(str(e)) > 2])
+        if not lista_final:
+            logging.warning(f"⚠️ No se detectaron operadores activos para la fecha {f_gestion}.")
+            raise ValueError(f"Lista de operadores vacía. Reintentando transformación en el próximo intervalo.")
         df_res = pd.DataFrame(lista_final, columns=['EMPLEADO'])
         for c in ['qg', 'sc', 'qp', 'ms', 'qe', 'qs']: df_res[c] = 0.0
 

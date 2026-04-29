@@ -37,7 +37,7 @@ class WebFlowAPI:
             time.sleep(2)
         res = self.session.post(f"{self.url_base}/{endpoint}", data=payload, headers=self.headers)
         if res.status_code == 200 and len(res.text) > 50 and "<HTML" not in res.text.upper()[:100]:
-            return pd.read_csv(StringIO(res.text), sep='\t', encoding='latin-1', on_bad_lines='skip')
+            return pd.read_csv(StringIO(res.text), sep='\t', encoding='latin-1', on_bad_lines='skip', quoting=3)
         return pd.DataFrame()
 
     def get_entregas(self, ids_cliente=[330, 260], estados=[302, 303]):
