@@ -129,6 +129,8 @@ with DAG(
             'Tramo inicial':           'initial_bracket',
             'Tramo actual':            'current_bracket',
             'Fecha asignacion cuota':  'due_date',
+            'Segmento':  'segment',
+
         })
 
         df['phone'] = df['phone'].astype(str).str.replace('+', '', regex=False)
@@ -138,14 +140,14 @@ with DAG(
             'installment_id', 'payment_date', 'amount', 'fee_amount',
             'installment_number', 'amount_to_collect', 'capital_assigned',
             'order_id', 'user_email', 'user_uuid', 'phone', 'dni_cedula',
-            'user_name', 'initial_bracket', 'current_bracket', 'due_date',
+            'user_name', 'initial_bracket', 'current_bracket', 'due_date', 'segment',
             'stock_date', 'portfolio'
         ]
 
         df = df[cols[:-1]].where(pd.notna(df[cols[:-1]]), None)
         df['portfolio'] = 'Cashea'
 
-        update_cols = ['current_bracket', 'due_date', 'stock_date', 'amount_to_collect', 'phone', 'user_email', 'user_name']
+        update_cols = ['current_bracket', 'due_date', 'stock_date', 'amount_to_collect', 'phone', 'user_email', 'segment','user_name']
         update_set = ", ".join([f"{c} = EXCLUDED.{c}" for c in update_cols])
 
         sql = f"""
